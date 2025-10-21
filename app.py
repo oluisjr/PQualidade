@@ -9,7 +9,7 @@ from pyecharts.globals import ChartType, SymbolType
 from pyecharts.commons.utils import JsCode
 from collections import Counter
 
-logo_path=r"C:\Users\csp4992\OneDrive - Companhia Siderurgica Nacional\Área de Trabalho\PROJECTS\PQUALIDADE\assets\logoA.png"
+logo_path="assets/logoA.png"
 
 # --- Configurações da Aplicação ---
 st.set_page_config(layout="wide", page_title="Otimização de Estoque", page_icon=logo_path, initial_sidebar_state="expanded")
@@ -258,8 +258,8 @@ numeric_cols_c = ['Esp', 'Tol. Inf. Esp.', 'Tol. Sup. Esp.', 'Larg.', 'Tol. Inf.
 numeric_cols_e = ['Esp R', 'Esp C', 'Esp BFF', 'Larg R', 'Larg BFF', 'Larg C', 'Peso Peca', 'Peso Minimo', 'Peso Maximo', 'Quantidade de Oleo', 'Peso Estoque']
 
 # --- Caminhos e Carregamento ---
-PATH_CARTEIRA = r"C:\Users\csp4992\OneDrive - Companhia Siderurgica Nacional\Área de Trabalho\PROJECTS\PROJETO QUALIDADE\Carteira_Geral NOVA_GERAL-pt-br.xlsx"
-PATH_ESTOQUE = r"C:\Users\csp4992\OneDrive - Companhia Siderurgica Nacional\Área de Trabalho\PROJECTS\PROJETO QUALIDADE\Estoque CSN Porto Real-pt-br.xlsx"
+PATH_CARTEIRA = "Carteira_Geral NOVA_GERAL-pt-br.xlsx"
+PATH_ESTOQUE = "Estoque CSN Porto Real-pt-br.xlsx"
 df_carteira, df_estoque, error_msg = load_and_cache_data(PATH_CARTEIRA, PATH_ESTOQUE, numeric_cols_c, numeric_cols_e)
 
 
@@ -530,4 +530,5 @@ if df_carteira is not None and df_estoque is not None:
              st.error("Nenhum item de origem selecionado. Por favor, preencha o formulário na barra lateral e clique em analisar.")
 
 st.markdown("---")
+
 st.markdown("Desenvolvido por *Luis Ignacio*")
