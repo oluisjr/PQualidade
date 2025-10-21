@@ -2,5 +2,3 @@ pandas
 numpy
 streamlit
 pyecharts
-collections
-pip>=25
