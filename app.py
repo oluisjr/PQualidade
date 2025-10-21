@@ -283,7 +283,7 @@ if df_carteira is not None and df_estoque is not None:
     tab1, tab2 = st.tabs(["Dashboard Geral", "Análise de Compatibilidade"])
 
     with tab1:
-        st.header("Dashboard Geral da Operação")
+        st.header("Dashboard Geral de Operação")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -532,3 +532,4 @@ if df_carteira is not None and df_estoque is not None:
 st.markdown("---")
 
 st.markdown("Desenvolvido por *Luis Ignacio*")
+
