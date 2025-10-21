@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Otimização de Estoque</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f0f2f6; --sidebar-bg: #fafafa; --card-bg: #ffffff; 
+            --text-color: #31333F; --primary-color: #FF4B4B; --border-color: #e6e6e6;
+            --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        }
+        body { font-family: 'Roboto', sans-serif; margin: 0; background-color: var(--bg-color); color: var(--text-color); line-height: 1.6; }
+        .container { display: flex; height: 100vh; }
+        .sidebar { width: 300px; background-color: var(--sidebar-bg); padding: 2rem; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-shadow: var(--shadow); }
+        .main-content { flex-grow: 1; padding: 2rem; overflow-y: auto; max-width: 1000px; margin: 0 auto;}
+        h1 { font-weight: 500; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-top: 0;}
+        h2, h3 { font-weight: 500; }
+        .kpi-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+        .kpi-card { background-color: var(--card-bg); padding: 1.5rem; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+        .kpi-card h3 { margin: 0 0 0.5rem 0; font-size: 1rem; color: #666; font-weight: 400; }
+        .kpi-card p { margin: 0; font-size: 2rem; font-weight: 700; color: var(--text-color); }
+        .chart-container { display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; }
+        .chart-card { background-color: var(--card-bg); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+        .chart { width: 100%; height: 500px; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { font-weight: 500; margin-bottom: 0.5rem; display: block; }
+        select, input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; font-size: 1rem; background-color: #fff; }
+        button { background-color: var(--primary-color); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #e03a3a; }
+        #results-area { margin-top: 2rem; }
+        .result-item { background: var(--card-bg); padding: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
+        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background-color: #fafafa; }
+        .loader, .error, .no-results { text-align: center; padding: 2rem; margin-top: 1rem; font-size: 1.1rem; border-radius: 8px; }
+        .error { color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .no-results { color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; }
+        .non-match { background-color: #FFCDD2 !important; }
+        .match { color: #155724 !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h2>Controles de Análise</h2>
+            <div class="form-group">
+                <label for="search-type">Tipo de Pesquisa</label>
+                <select id="search-type">
+                    <option value="pedido">Por Pedido (OV)</option>
+                    <option value="lote">Por Lote (Estoque)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="source-items">Selecione o Item de Origem</label>
+                <select id="source-items" disabled><option>Carregando...</option></select>
+            </div>
+            <div class="form-group">
+                <label for="similarity-slider">Índice Mínimo de Similaridade: <span id="slider-value">75%</span></label>
+                <input type="range" id="similarity-slider" min="0" max="100" value="75" step="5">
+            </div>
+            <button id="analyze-button">Analisar Compatibilidade</button>
+        </aside>
+        <main class="main-content">
+            <section id="dashboard-area">
+                <h1>Dashboard Geral da Operação</h1>
+                <div class="kpi-container" id="kpi-container"><!-- KPIs --></div>
+                <div class="chart-container">
+                    <div class="chart-card"><h3>Mapa de Destinos (Pedidos em Carteira)</h3><div id="map-chart" class="chart"></div></div>
+                    <div class="chart-card"><h3>Radar: Estoque vs. Carteira</h3><div id="radar-chart" class="chart"></div></div>
+                </div>
+            </section>
+            <section id="results-area"><!-- Resultados --></section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/js/world.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchTypeSelect = document.getElementById('search-type');
+            const sourceItemsSelect = document.getElementById('source-items');
+            const similaritySlider = document.getElementById('similarity-slider');
+            const sliderValue = document.getElementById('slider-value');
+            const analyzeButton = document.getElementById('analyze-button');
+            const resultsArea = document.getElementById('results-area');
+            const dashboardArea = document.getElementById('dashboard-area');
+
+            const displayError = (area, error) => {
+                console.error(error);
+                let errorMessage = "Ocorreu um erro inesperado.";
+                if (error instanceof Error) errorMessage = error.message;
+                else if (typeof error === 'string') errorMessage = error;
+                area.innerHTML = `<div class="error"><strong>Erro:</strong> ${errorMessage}</div>`;
+            };
+
+            const initDashboard = async () => {
+                try {
+                    const response = await fetch('/api/dashboard-data');
+                    if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || 'Falha ao carregar dados do dashboard'); }
+                    const data = await response.json();
+                    
+                    document.getElementById('kpi-container').innerHTML = `
+                        <div class="kpi-card"><h3>Pedidos em Carteira</h3><p>${data.kpis.pedidos_carteira.toLocaleString('pt-BR')}</p></div>
+                        <div class="kpi-card"><h3>Lotes em Estoque</h3><p>${data.kpis.lotes_estoque.toLocaleString('pt-BR')}</p></div>
+                        <div class="kpi-card"><h3>Peso Total (t)</h3><p>${data.kpis.peso_total_estoque.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div>
+                    `;
+
+                    const mapChart = echarts.init(document.getElementById('map-chart'));
+                    mapChart.setOption({
+                        backgroundColor: '#FFFFFF',
+                        geo: { map: 'world', roam: true, silent: true, center: [-70, 10], zoom: 2.5, itemStyle: { areaColor: '#E0E0E0', borderColor: '#BDBDBD' }, emphasis: { itemStyle: { areaColor: '#C1C1C1' } } },
+                        tooltip: { trigger: 'item', formatter: p => p.seriesType === 'scatter' ? `${p.name} : ${p.value[2]} pedidos` : p.name },
+                        series: [
+                            { name: 'Rotas', type: 'lines', coordinateSystem: 'geo', zlevel: 2, effect: { show: true, period: 6, trailLength: 0, symbol: 'arrow', symbolSize: 6, color: '#0056b3' }, lineStyle: { color: '#0056b3', width: 1, opacity: 0.6, curveness: 0.2 }, data: data.mapData.routes },
+                            { name: 'Pedidos', type: 'scatter', coordinateSystem: 'geo', zlevel: 2, label: { show: true, position: 'right', formatter: '{b}', color: '#333' }, symbolSize: val => 5 + Math.log(val[2] + 1) * 4, itemStyle: { color: '#D32F2F' }, data: data.mapData.cities }
+                        ]
+                    });
+
+                    const radarChart = echarts.init(document.getElementById('radar-chart'));
+                    radarChart.setOption({
+                        color: ['#5470C6', '#91CC75'], title: { text: 'Estoque vs Demanda', left: 'center' },
+                        legend: { bottom: 5, data: ['Estoque (Peso)', 'Carteira (Nº Pedidos)'], itemGap: 20 },
+                        radar: { indicator: data.radarData.labels.map(name => ({ name })), shape: 'circle', splitNumber: 5, axisName: { color: '#666' }, splitLine: { lineStyle: { color: '#ddd' } }, splitArea: { show: false }, axisLine: { lineStyle: { color: '#ccc' } } },
+                        series: [{ name: 'Comparativo', type: 'radar', emphasis: { lineStyle: { width: 4 } },
+                            data: [
+                                { value: data.radarData.estoque, name: 'Estoque (Peso)', areaStyle: { color: 'rgba(84, 112, 198, 0.4)' } },
+                                { value: data.radarData.carteira, name: 'Carteira (Nº Pedidos)', areaStyle: { color: 'rgba(145, 204, 117, 0.4)' } }
+                            ]
+                        }]
+                    });
+                    
+                    window.addEventListener('resize', () => { mapChart.resize(); radarChart.resize(); });
+                } catch (error) { displayError(dashboardArea, error); }
+            };
+
+            const loadSourceItems = async () => {
+                const searchType = searchTypeSelect.value;
+                sourceItemsSelect.innerHTML = '<option>Carregando...</option>';
+                sourceItemsSelect.disabled = true;
+                try {
+                    const response = await fetch(`/api/source-items/${searchType}`);
+                    if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Falha ao buscar itens'); }
+                    const items = await response.json();
+                    sourceItemsSelect.innerHTML = '<option value="">Selecione um item</option>';
+                    items.forEach(item => { sourceItemsSelect.innerHTML += `<option value="${item}">${item}</option>`; });
+                    sourceItemsSelect.disabled = false;
+                } catch (error) {
+                    sourceItemsSelect.innerHTML = `<option>Erro ao carregar</option>`;
+                    displayError(resultsArea, error);
+                }
+            };
+
+            const renderResults = (data) => {
+                resultsArea.innerHTML = '';
+                const filteredResults = data.results.filter(r => r['Índice de Similaridade'] >= similaritySlider.value / 100);
+
+                if (filteredResults.length === 0) {
+                    resultsArea.innerHTML = `<div class="no-results">Nenhum item compatível encontrado com o índice de ${similaritySlider.value}%.</div>`;
+                    return;
+                }
+
+                const { sourceItem, mapping } = data;
+                const targetIdCol = searchTypeSelect.value === 'pedido' ? 'Lote Gsd' : 'OV Item';
+                const sourceIdCol = searchTypeSelect.value === 'pedido' ? 'OV Item' : 'Lote Gsd';
+                
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                
+                let tableHTML = `
+                    <h3>Análise para: <code>${sourceItem[sourceIdCol]}</code></h3>
+                    <p>${filteredResults.length} itens compatíveis encontrados.</p>
+                    <table><thead><tr><th>${targetIdCol}</th><th>Similaridade</th>`;
+                const headerCols = Object.values(mapping).flat().filter((v, i, a) => a.indexOf(v) === i);
+                headerCols.forEach(col => tableHTML += `<th>${col}</th>`);
+                tableHTML += `</tr></thead><tbody>`;
+
+                filteredResults.forEach(row => {
+                    tableHTML += `<tr><td>${row[targetIdCol]}</td><td>${(row['Índice de Similaridade'] * 100).toFixed(0)}%</td>`;
+                    headerCols.forEach(col => {
+                         const sourceColKey = Object.keys(mapping).find(k => (Array.isArray(mapping[k]) ? mapping[k].includes(col) : mapping[k] === col));
+                         const isMatch = row.match_details[sourceColKey] ?? true;
+                         tableHTML += `<td class="${isMatch ? '' : 'non-match'}">${row[col] ?? '-'}</td>`;
+                    });
+                    tableHTML += `</tr>`;
+                });
+                tableHTML += `</tbody></table>`;
+                resultItem.innerHTML = tableHTML;
+                resultsArea.appendChild(resultItem);
+            };
+            
+            searchTypeSelect.addEventListener('change', loadSourceItems);
+            similaritySlider.addEventListener('input', () => { sliderValue.textContent = `${similaritySlider.value}%`; });
+
+            analyzeButton.addEventListener('click', async () => {
+                const selectedItem = sourceItemsSelect.value;
+                if (!selectedItem) { alert('Por favor, selecione um item de origem.'); return; }
+                
+                resultsArea.innerHTML = '<div class="loader">Analisando...</div>';
+                dashboardArea.style.display = 'none';
+
+                try {
+                    const response = await fetch(`/api/analyze/${searchTypeSelect.value}/${selectedItem}`);
+                    if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Erro na análise'); }
+                    const data = await response.json();
+                    renderResults(data);
+                } catch (error) { displayError(resultsArea, error); }
+            });
+
+            initDashboard();
+            loadSourceItems();
+        });
+    </script>
+</body>
+</html>
+
