@@ -1,6 +1,6 @@
+streamlit==1.32.2
 pandas
 numpy
-streamlit
 pyecharts
 openpyxl
 matplotlib
