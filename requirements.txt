@@ -4,3 +4,4 @@ streamlit
 pyecharts
 openpyxl
 matplotlib
+altair==4.2.2
