@@ -5,3 +5,4 @@ pyecharts
 openpyxl
 matplotlib
 altair==4.2.2
+Pillow==9.5.0
